@@ -4,6 +4,7 @@ const AXIOS = require('axios');
 const DAYJS = require('dayjs')
 const AWS = require('aws-sdk');
 
+// TODO Change env variables to parameter store instead of .env file : https://evanhalley.dev/post/aws-ssm-node/
 AWS.config.update({
     "region": process.env.AWS_REGION,
     "accessKeyId": process.env.AWS_ACCESS_KEY,
