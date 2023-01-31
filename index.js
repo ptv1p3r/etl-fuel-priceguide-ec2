@@ -17,7 +17,7 @@ const ENDPOINT_02 = process.env.DBEG_ENDPOINT_2;
 const DATA_TABLE = process.env.AWS_DYNAMO_TABLE;
 const DATA_TABLE_PRICES = process.env.AWS_DYNAMO_TABLE_PRICES;
 
-const DEBUG = false;
+const DEBUG = true;
 
 let docClient = new AWS.DynamoDB.DocumentClient();
 
@@ -26,6 +26,51 @@ let clientsListFiltered = [];
 
 const startDate = DAYJS();
 
+const test = {
+    Codigo:66064,
+}
+
+const item = [
+    {
+        Timestamp: "2023-01-30 20:23:54",
+        Id: 66064,
+        Combustiveis: [
+            {
+                DataAtualizacao: "2023-01-30 06:30",
+                TipoCombustivel: "Gasóleo simples",
+                Preco: "1,769 €/litro"
+            },
+            {
+                DataAtualizacao: "2023-01-30 06:30",
+                TipoCombustivel: "Gasóleo especial",
+                Preco: "1,899 €/litro"
+            },
+            {
+                DataAtualizacao: "2023-01-30 06:30",
+                TipoCombustivel: "Gasóleo colorido",
+                Preco: "1,384 €/litro"
+            },
+            {
+                DataAtualizacao: "2023-01-30 06:30",
+                TipoCombustivel: "Gasolina simples 95", "Preco": "1,834 €/litro"
+            },
+            {
+                DataAtualizacao: "2023-01-30 06:30",
+                TipoCombustivel: "Gasolina 98",
+                Preco: "2,074 €/litro"
+            }
+        ],
+
+    }];
+
+// queryDynamoClientPrice(test)
+//     .then( async (data) => {
+//         await checkClientPrices(data, item);
+//     })
+//     .catch( (error) => {
+//         if (DEBUG) console.log(error);
+//     });
+
 getAllData()
     .then( () => {
         getFilteredData()
@@ -33,16 +78,34 @@ getAllData()
 
                 await createClient()
                     .then( () => {
-                        console.log("db created successfully ..");
+                        if (DEBUG) console.log("db created successfully ..");
                     })
                     .catch( (error) => {
-                        if (DEBUG) console.log(error);
+                        if (DEBUG) if (DEBUG) console.log(error);
                     });
 
                 const endDate = DAYJS();
-                console.log("Time for execution(minutes): " + endDate.diff(startDate, 'minute'));
+                if (DEBUG) console.log("Time for execution(minutes): " + endDate.diff(startDate, 'minute'));
             });
     });
+
+async function checkClientPrices(clientPrices, clientItem) {
+    // console.log(JSON.stringify(clientPrices));
+    console.log(JSON.stringify(clientItem));
+
+    const key = 'DataAtualizacao';
+
+    // get unique objects by key from price array
+    const uniqueClientPrices = [...new Map(clientPrices.Items[0].Combustiveis.map(item =>
+        [item[key], item])).values()];
+
+    // get unique objects by key from price current item array
+    const uniqueClientItemPrices = [...new Map(clientItem[0].Combustiveis.map(item =>
+        [item[key], item])).values()];
+
+    // console.log(uniqueClientPrices);
+    // console.log(JSON.stringify(uniqueClientItemPrices));
+}
 
 async function getAllData() {
 
@@ -57,7 +120,7 @@ async function getAllData() {
                 }
                 clientsList.push(client);
             })
-            console.log("List raw: " + clientsList.length);
+            if (DEBUG) console.log("List raw: " + clientsList.length);
         })
         .catch(error => {
             // handle error
@@ -106,7 +169,7 @@ async function getFilteredData() {
             });
     }
 
-    console.log("List filtered: " + clientsListFiltered.length);
+    if (DEBUG) console.log("List filtered: " + clientsListFiltered.length);
 }
 
 /** Resolves if creation of client on dynamo is successfully executed
@@ -122,7 +185,7 @@ async function createClient() {
 
         await createDynamoClient(clientRow)
             .then( async () => {
-                console.log("Client created successfully ..");
+                if (DEBUG) console.log("Client created successfully ..");
             })
             .catch( (error) => {
                 if (DEBUG) console.log(error);
@@ -130,7 +193,7 @@ async function createClient() {
 
     }
 
-    console.log("Clients added: " + clientsListFiltered.length);
+    if (DEBUG) console.log("Clients added: " + clientsListFiltered.length);
 }
 
 /** Resolves if creation of client on dynamo is successfully executed
@@ -143,13 +206,45 @@ async function createClient() {
  */
 function createDynamoClientPrice(clientItem, ) {
     return new Promise(async(resolve, reject) => {
-        console.log('-> Creating client price in dynamo');
+        if (DEBUG) console.log('-> Creating client price in dynamo');
 
         let params = await buildCreatePriceParams(clientItem);
 
         docClient.put(params).promise()
             .then( data => {
-                console.log(`Client price created successfully..`);
+                if (DEBUG) console.log(`Client price created successfully..`);
+                return resolve(data);
+            })
+            .catch(err => {
+                // Internal error -> rejects with 500
+                // let response = API.buildResponse(API.RESPONSE.INTERNAL_SERVER_ERROR, globalContext);
+                if (DEBUG) console.log(err);
+
+                return reject({
+                    errorResponse: err.errorResponse,
+                    errorMessage: err
+                });
+            });
+    });
+}
+
+/** Resolves if query of client price on dynamo is successfully executed
+ *  Rejects if something wrong happens in this data process
+ *
+ *  - Rejects with 500 - if something wrong happens putting in the dynamo
+ *
+ * @param {Object} clientItem
+ * @returns {Promise<unknown>}
+ */
+function queryDynamoClientPrice(clientItem, ) {
+    return new Promise(async(resolve, reject) => {
+        if (DEBUG) console.log('-> Query client price in dynamo');
+
+        let params = await buildQueryPriceParams(clientItem);
+
+        docClient.query(params).promise()
+            .then( data => {
+                if (DEBUG) console.log(`Client price retrieved successfully..`);
                 return resolve(data);
             })
             .catch(err => {
@@ -175,20 +270,20 @@ function createDynamoClientPrice(clientItem, ) {
  */
 function createDynamoClient(clientItem, ) {
     return new Promise(async(resolve, reject) => {
-        console.log('-> Creating client in dynamo');
+        if (DEBUG) console.log('-> Creating client in dynamo');
 
         let params = await buildCreateParams(clientItem);
 
         // create client details
         docClient.put(params).promise()
             .then( async data => {
-                console.log(`Client created successfully..`);
-                console.log(`Client created data: ` + JSON.stringify(data));
+                if (DEBUG) console.log(`Client created successfully..`);
+                if (DEBUG) console.log(`Client created data: ` + JSON.stringify(data));
 
                 // create price list for client
                 await createDynamoClientPrice(clientItem)
                     .then(() => {
-                        console.log("Client price created successfully ..");
+                        if (DEBUG) console.log("Client price created successfully ..");
                     })
                     .catch((error) => {
                         if (DEBUG) console.log(error);
@@ -202,10 +297,12 @@ function createDynamoClient(clientItem, ) {
                 // Client id allready exists just update prices
                 if (err.message === 'The conditional request failed at Request' || err.code === 'ConditionalCheckFailedException') {
 
+
+                    // TODO Validate current price list with last db imported price list and get last item from bd to check last update datetime
                     // create price list for client
                     await createDynamoClientPrice(clientItem)
                         .then(() => {
-                            console.log("Client price updated successfully ..");
+                            if (DEBUG) console.log("Client price updated successfully ..");
                         })
                         .catch((error) => {
                             if (DEBUG) console.log(error);
@@ -224,6 +321,34 @@ function createDynamoClient(clientItem, ) {
             });
     });
 }
+
+/** Resolves always a params object to be used in dynamoPut.
+ *
+ * @param {Object} clientItem - Contains the identifier from queryString parameter.
+ *
+ */
+function buildQueryPriceParams(clientItem, ) {
+    return new Promise((resolve, reject) => {
+        let params = {
+            TableName: DATA_TABLE_PRICES,
+            KeyConditionExpression: 'Id = :v_ID AND #v_timestamp <= :v_timestamp',
+            ExpressionAttributeNames: {
+                "#v_timestamp": "Timestamp"
+            },
+            ExpressionAttributeValues: {
+                ":v_ID": clientItem.Codigo,
+                ":v_timestamp": DAYJS().format('YYYY-MM-DD HH:mm:ss'),
+            },
+            ScanIndexForward: false, //DESC ORDER, Set 'true' if asc order
+            Limit: 1,
+        };
+
+        if (DEBUG) console.log('PARAMS: ', params);
+
+        return resolve(params);
+    });
+}
+
 
 /** Resolves always a params object to be used in dynamoPut.
  *
