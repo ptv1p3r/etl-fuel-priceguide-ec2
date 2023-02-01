@@ -4,7 +4,7 @@ const AXIOS = require('axios');
 const DAYJS = require('dayjs')
 const AWS = require('aws-sdk');
 
-const DEBUG = true;
+const DEBUG = false;
 
 AWS.config.update({
     "region": process.env.AWS_REGION,
@@ -25,43 +25,6 @@ let clientsList = [];
 let clientsListFiltered = [];
 
 const startDate = DAYJS();
-
-const test = {
-    Codigo:66064,
-}
-
-const item = [
-    {
-        Timestamp: "2023-01-30 20:23:54",
-        Id: 66064,
-        Combustiveis: [
-            {
-                DataAtualizacao: "2023-01-30 06:30",
-                TipoCombustivel: "Gasóleo simples",
-                Preco: "1,769 €/litro"
-            },
-            {
-                DataAtualizacao: "2023-01-30 06:30",
-                TipoCombustivel: "Gasóleo especial",
-                Preco: "1,899 €/litro"
-            },
-            {
-                DataAtualizacao: "2023-01-30 06:30",
-                TipoCombustivel: "Gasóleo colorido",
-                Preco: "1,384 €/litro"
-            },
-            {
-                DataAtualizacao: "2023-01-30 06:30",
-                TipoCombustivel: "Gasolina simples 95", "Preco": "1,834 €/litro"
-            },
-            {
-                DataAtualizacao: "2023-01-30 06:30",
-                TipoCombustivel: "Gasolina 98",
-                Preco: "2,074 €/litro"
-            }
-        ],
-
-    }];
 
 getAWSParameters('fuelpriceguide')
     .then( parametersKeys =>{
