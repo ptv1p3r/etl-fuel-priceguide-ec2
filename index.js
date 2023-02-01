@@ -4,22 +4,22 @@ const AXIOS = require('axios');
 const DAYJS = require('dayjs')
 const AWS = require('aws-sdk');
 
-// TODO Change env variables to parameter store instead of .env file : https://evanhalley.dev/post/aws-ssm-node/
+const DEBUG = true;
+
 AWS.config.update({
     "region": process.env.AWS_REGION,
     "accessKeyId": process.env.AWS_ACCESS_KEY,
     "secretAccessKey": process.env.AWS_ACCESS_KEY_SECRET
 });
 
-const ENDPOINT_01 = process.env.DBEG_ENDPOINT_1;
-const ENDPOINT_02 = process.env.DBEG_ENDPOINT_2;
-
-const DATA_TABLE = process.env.AWS_DYNAMO_TABLE;
-const DATA_TABLE_PRICES = process.env.AWS_DYNAMO_TABLE_PRICES;
-
-const DEBUG = true;
-
+// AWS Services
+const ssmClient = new AWS.SSM();
 let docClient = new AWS.DynamoDB.DocumentClient();
+
+let ENDPOINT_01 ;
+let ENDPOINT_02 ;
+let DATA_TABLE ;
+let DATA_TABLE_PRICES ;
 
 let clientsList = [];
 let clientsListFiltered = [];
@@ -63,31 +63,39 @@ const item = [
 
     }];
 
-// queryDynamoClientPrice(test)
-//     .then( async (data) => {
-//         await checkClientPrices(data, item);
-//     })
-//     .catch( (error) => {
-//         if (DEBUG) console.log(error);
-//     });
+getAWSParameters('fuelpriceguide')
+    .then( parametersKeys =>{
+        if (DEBUG) console.log(JSON.stringify(parametersKeys));
 
-getAllData()
+        // define aplication parameters
+        DATA_TABLE = parametersKeys[2].Value;
+        DATA_TABLE_PRICES = parametersKeys[3].Value;
+        ENDPOINT_01 = parametersKeys[5].Value;
+        ENDPOINT_02 = parametersKeys[6].Value;
+    })
     .then( () => {
-        getFilteredData()
-            .then( async () => {
+        // fetch all fuel data
+        getAllData()
+            .then( () => {
+                // filtered data
+                getFilteredData()
+                    .then( async () => {
+                        // create clients
+                        await createClient()
+                            .then( () => {
+                                if (DEBUG) console.log("db created successfully ..");
+                            })
+                            .catch( (error) => {
+                                if (DEBUG) console.log(error);
+                            });
 
-                await createClient()
-                    .then( () => {
-                        if (DEBUG) console.log("db created successfully ..");
-                    })
-                    .catch( (error) => {
-                        if (DEBUG) if (DEBUG) console.log(error);
+                        const endDate = DAYJS();
+                        if (DEBUG) console.log("Time for execution(minutes): " + endDate.diff(startDate, 'minute'));
                     });
-
-                const endDate = DAYJS();
-                if (DEBUG) console.log("Time for execution(minutes): " + endDate.diff(startDate, 'minute'));
+                // TODO ENVIAR EMAIL POR AWS SES COM RELATORIO DA IMPORTACAO
             });
-    });
+    })
+
 
 async function checkClientPrices(clientPrices, clientItem) {
     // console.log(JSON.stringify(clientPrices));
@@ -400,5 +408,40 @@ function buildCreateParams(clientItem, ) {
         if (DEBUG) console.log('PARAMS: ', params);
 
         return resolve(params);
+    });
+}
+
+/** Resolves if retrieval of aws store parameters is successfully executed
+ *  Rejects if something wrong happens in this data process
+ *
+ *  - Rejects with 500 - if something wrong happens retrieving keys
+ *
+ * @param {String} filterKey app key
+ * @returns {Promise<unknown>}
+ */
+function getAWSParameters(filterKey,) {
+    return new Promise(async (resolve, reject) => {
+        if (DEBUG) console.log('-> Retrieving keys from aws parameter store');
+
+        const params = {
+            Path: `/${filterKey}/`,
+            Recursive: true,
+            WithDecryption: false
+        }
+
+        await ssmClient.getParametersByPath(params).promise()
+            .then(data => {
+                if (DEBUG) console.log(`AWS Parameters data: ` + JSON.stringify(data));
+                return resolve(data.Parameters);
+            })
+            .catch(err => {
+                // Internal error -> rejects with 500
+                if (DEBUG) console.log(err);
+
+                return reject({
+                    errorResponse: err.message,
+                    errorMessage: err
+                });
+            })
     });
 }
