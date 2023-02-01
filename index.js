@@ -31,10 +31,10 @@ getAWSParameters('fuelpriceguide')
         if (DEBUG) console.log(JSON.stringify(parametersKeys));
 
         // define aplication parameters
-        DATA_TABLE = parametersKeys[2].Value;
-        DATA_TABLE_PRICES = parametersKeys[3].Value;
-        ENDPOINT_01 = parametersKeys[5].Value;
-        ENDPOINT_02 = parametersKeys[6].Value;
+        DATA_TABLE = parametersKeys[0].Value;
+        DATA_TABLE_PRICES = parametersKeys[1].Value;
+        ENDPOINT_01 = parametersKeys[2].Value;
+        ENDPOINT_02 = parametersKeys[3].Value;
     })
     .then( () => {
         // fetch all fuel data
