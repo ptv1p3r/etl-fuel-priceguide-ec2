@@ -4,7 +4,7 @@ const AXIOS = require('axios');
 const DAYJS = require('dayjs')
 const AWS = require('aws-sdk');
 
-const DEBUG = false;
+const DEBUG = true;
 
 AWS.config.update({
     "region": process.env.AWS_REGION,
@@ -26,6 +26,7 @@ let clientsListFiltered = [];
 
 const startDate = DAYJS();
 
+console.log("->ETL Fuel Price Guide Started...: " + startDate);
 getAWSParameters('fuelpriceguide')
     .then( parametersKeys =>{
         if (DEBUG) console.log(JSON.stringify(parametersKeys));
@@ -53,7 +54,8 @@ getAWSParameters('fuelpriceguide')
                             });
 
                         const endDate = DAYJS();
-                        if (DEBUG) console.log("Time for execution(minutes): " + endDate.diff(startDate, 'minute'));
+                        console.log("->ETL Fuel Price Guide ended...: " + endDate);
+                        console.log("->ETL Time for execution (minutes): " + endDate.diff(startDate, 'minute'));
                     });
                 // TODO ENVIAR EMAIL POR AWS SES COM RELATORIO DA IMPORTACAO
             });
@@ -113,13 +115,11 @@ async function getFilteredData() {
 
         await AXIOS.get(ENDPOINT_02 + clientRow.id)
             .then((response) => {
-                //console.log(response2);
 
                 if (response.data.resultado.Nome != null &&
                     response.data.resultado.Morada != null &&
                     response.data.resultado.Combustiveis != null) {
 
-                    //console.log(response.data);
                     let client = {
                         Codigo: clientRow.id,
                         Nome: clientRow.nome,
@@ -131,6 +131,15 @@ async function getFilteredData() {
                         MeiosPagamento: response.data.resultado.MeiosPagamento,
                         Combustiveis: response.data.resultado.Combustiveis,
                     }
+
+                    let locality = {
+                        Codigo: "Aveiro_Vale-de-Cambra_Vale-de-Cambra_3730-241",
+                        Distrito: response.data.resultado.Morada.Distrito,
+                        Municipio: response.data.resultado.Morada.Municipio,
+                        Localidade: response.data.resultado.Morada.Localidade,
+                        CodPostal: response.data.resultado.Morada.CodPostal,
+                    }
+
                     clientsListFiltered.push(client);
                 }
             })
@@ -167,10 +176,10 @@ async function createClient() {
     if (DEBUG) console.log("Clients added: " + clientsListFiltered.length);
 }
 
-/** Resolves if creation of client on dynamo is successfully executed
+/** Resolves if creation of client price on dynamo is successfully executed
  *  Rejects if something wrong happens in this data process
  *
- *  - Rejects with 500 - if something wrong happens putting in the dynamo
+ *  - Rejects with 500 - if something wrong happens putting in dynamo
  *
  * @param {Object} clientItem
  * @returns {Promise<unknown>}
@@ -184,6 +193,38 @@ function createDynamoClientPrice(clientItem, ) {
         docClient.put(params).promise()
             .then( data => {
                 if (DEBUG) console.log(`Client price created successfully..`);
+                return resolve(data);
+            })
+            .catch(err => {
+                // Internal error -> rejects with 500
+                // let response = API.buildResponse(API.RESPONSE.INTERNAL_SERVER_ERROR, globalContext);
+                if (DEBUG) console.log(err);
+
+                return reject({
+                    errorResponse: err.errorResponse,
+                    errorMessage: err
+                });
+            });
+    });
+}
+
+/** Resolves if creation of localities on dynamo is successfully executed
+ *  Rejects if something wrong happens in this data process
+ *
+ *  - Rejects with 500 - if something wrong happens putting in dynamo
+ *
+ * @param {Object} clientItem
+ * @returns {Promise<unknown>}
+ */
+function createDynamoLocalities(clientItem, ) {
+    return new Promise(async(resolve, reject) => {
+        if (DEBUG) console.log('-> Creating locality in dynamo');
+
+        let params = await buildCreateLocalityParams(clientItem);
+
+        docClient.put(params).promise()
+            .then( data => {
+                if (DEBUG) console.log(`Locality created successfully..`);
                 return resolve(data);
             })
             .catch(err => {
@@ -327,6 +368,29 @@ function buildQueryPriceParams(clientItem, ) {
  *
  */
 function buildCreatePriceParams(clientItem, ) {
+    return new Promise((resolve, reject) => {
+        let params = {
+            TableName: DATA_TABLE_PRICES,
+            Item: {
+                Id: clientItem.Codigo,
+                Combustiveis: clientItem.Combustiveis,
+                Timestamp: DAYJS().format('YYYY-MM-DD HH:mm:ss'),
+            },
+            // ConditionExpression: 'attribute_not_exists(Id)', // only create new account if it does not exist
+        };
+
+        if (DEBUG) console.log('PARAMS: ', params);
+
+        return resolve(params);
+    });
+}
+
+/** Resolves always a params object to be used in dynamoPut.
+ *
+ * @param {Object} clientItem - Contains the identifier from queryString parameter.
+ *
+ */
+function buildCreateLocalityParams(clientItem, ) {
     return new Promise((resolve, reject) => {
         let params = {
             TableName: DATA_TABLE_PRICES,
